@@ -1,20 +1,40 @@
-package org.example.app
-
-import org.example.utils.Printer
-
-//TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
-// click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
 fun main() {
-    val name = "Kotlin"
-    val second = ne    //TIP Press <shortcut actionId="ShowIntentionActions"/> with your caret at the highlighted text
-    // to see how IntelliJ IDEA suggests fixing it.
-    val message = "Hello, " + name + "!"
-    val printer = Printer(message)
-    printer.printMessage()
-
-    for (i in 1..5) {
-        //TIP Press <shortcut actionId="Debug"/> to start debugging your code. We have set one <icon src="AllIcons.Debugger.Db_set_breakpoint"/> breakpoint
-        // for you, but you can always add more by pressing <shortcut actionId="ToggleLineBreakpoint"/>.
-        println("i = $i")
+    println("🚀 Wallet CLI")
+    println("1) Create wallet")
+    println("2) Restore from seed")
+    print("> ")
+    when (readlnOrNull()?.trim()) {
+        "1" -> createFlow()
+        "2" -> restoreFlow()
+        else -> println("❌ Unknown option")
     }
+}
+
+private fun createFlow() {
+    val seed = WalletOps.generateSeed()
+    println("🧩 Seed:\n$seed")
+
+    val eth = WalletOps.ethAddressFromSeed(seed)
+    val btc = WalletOps.btcAddressFromSeed(seed)
+    println("💎 ETH: $eth")
+    println("₿ BTC:  $btc")
+
+    val enc = KeyVault.encrypt(seed.encodeToByteArray())
+    println("🔐 Encrypted (bytes): ${enc.size}")
+
+    val dec = String(KeyVault.decrypt(enc))
+    println("✅ Decrypted equals seed: ${dec == seed}")
+}
+
+private fun restoreFlow() {
+    print("Enter seed: ")
+    val seed = readlnOrNull()?.trim().orEmpty()
+    if (seed.isBlank()) {
+        println("❌ Empty seed")
+        return
+    }
+    val eth = WalletOps.ethAddressFromSeed(seed)
+    val btc = WalletOps.btcAddressFromSeed(seed)
+    println("💎 ETH: $eth")
+    println("₿ BTC:  $btc")
 }
