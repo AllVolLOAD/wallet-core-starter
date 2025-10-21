@@ -1,0 +1,59 @@
+import androidx.compose.ui.window.*
+import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import wallet.*
+
+@Composable
+fun WalletUI() {
+    var seed by remember { mutableStateOf("") }
+    var eth by remember { mutableStateOf("") }
+    var btc by remember { mutableStateOf("") }
+    var log by remember { mutableStateOf("") }
+
+    Column(Modifier.padding(16.dp)) {
+        Text("🚀 Wallet Desktop", style = MaterialTheme.typography.titleLarge)
+        Spacer(Modifier.height(12.dp))
+        Button(onClick = {
+            seed = WalletOps.generateSeed()
+            eth = WalletOps.ethAddressFromSeed(seed)
+            btc = WalletOps.btcAddressFromSeed(seed, "bech32", "mainnet")
+            log = "Created new wallet."
+        }) { Text("Create wallet") }
+
+        Spacer(Modifier.height(8.dp))
+        Button(onClick = {
+            if (seed.isBlank()) log = "No seed yet"
+            else {
+                val enc = KeyVault.encrypt(seed.encodeToByteArray())
+                SeedStorage.saveEncrypted(enc)
+                log = "Seed saved to file."
+            }
+        }) { Text("Encrypt & Save") }
+
+        Spacer(Modifier.height(8.dp))
+        Button(onClick = {
+            val enc = SeedStorage.loadEncryptedOrNull()
+            if (enc == null) log = "No encrypted seed found."
+            else {
+                seed = String(KeyVault.decrypt(enc))
+                eth = WalletOps.ethAddressFromSeed(seed)
+                btc = WalletOps.btcAddressFromSeed(seed)
+                log = "Restored from file."
+            }
+        }) { Text("Restore from file") }
+
+        Spacer(Modifier.height(16.dp))
+        Text("Seed: $seed")
+        Text("ETH: $eth")
+        Text("BTC: $btc")
+        Spacer(Modifier.height(8.dp))
+        Text("Log: $log")
+    }
+}
+
+fun main() = application {
+    Window(onCloseRequest = ::exitApplication, title = "Wallet Core Starter") {
+        MaterialTheme { WalletUI() }
+    }
+}
