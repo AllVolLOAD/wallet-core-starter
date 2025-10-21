@@ -1,4 +1,7 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+import java.security.MessageDigest
+
 
 plugins {
     kotlin("jvm")           // версия объявлена в корне
@@ -39,4 +42,45 @@ java {
     // привести Java-таски к тем же таргетам
     sourceCompatibility = JavaVersion.VERSION_1_8
     targetCompatibility = JavaVersion.VERSION_1_8
+}
+
+tasks.register("dist") {
+    group = "distribution"
+    description = "Create distribution package"
+
+    dependsOn("shadowJar")
+
+    doLast {
+        val distDir = file("${project.rootDir}/dist")
+        val shadowJarTask = tasks.getByName("shadowJar") as ShadowJar
+        val jarFile = shadowJarTask.archiveFile.get().asFile
+
+        // Очистка и создание папки dist
+        delete(distDir)
+        distDir.mkdirs()
+
+        // Копируем JAR
+        copy {
+            from(jarFile)
+            into(distDir)
+        }
+
+        // Копируем README
+        copy {
+            from("${project.rootDir}/README.md")
+            into(distDir)
+        }
+
+        // Генерируем SHA256 checksum
+        val checksumFile = file("${distDir}/wallet-cli.jar.sha256")
+        val checksum = MessageDigest.getInstance("SHA-256")
+            .digest(jarFile.readBytes())
+            .joinToString("") { byte -> "%02x".format(byte) }
+
+        checksumFile.writeText(checksum)
+
+        println("✅ Distribution created in: ${distDir.absolutePath}")
+        println("📦 JAR: ${jarFile.name} (${jarFile.length() / 1024} KB)")
+        println("🔒 SHA256: $checksum")
+    }
 }

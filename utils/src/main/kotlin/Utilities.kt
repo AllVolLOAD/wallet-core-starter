@@ -15,14 +15,29 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.security.SecureRandom
 import java.util.Base64
+import com.google.crypto.tink.CleartextKeysetHandle
+import com.google.crypto.tink.JsonKeysetReader
+import com.google.crypto.tink.JsonKeysetWriter
+import java.io.File
+import java.nio.file.Paths
+import org.bitcoinj.script.Script
 
-// --------- Хранилище ключа шифрования (Tink AEAD) ----------
+
 object KeyVault {
-    private val aead by lazy {
+    private val keysetFile = Paths.get(System.getProperty("user.home"), ".wallet-starter", "keyset.json").toFile()
+    private val aead: com.google.crypto.tink.Aead by lazy {
         AeadConfig.register()
-        val tpl = KeyTemplates.get("AES256_GCM") // рекомендовано Tink
-        KeysetHandle.generateNew(tpl)
-            .getPrimitive(com.google.crypto.tink.Aead::class.java)
+
+        if (keysetFile.exists()) {
+            // Загружаем существующий ключ
+            val keysetHandle = CleartextKeysetHandle.read(JsonKeysetReader.withFile(keysetFile))
+            keysetHandle.getPrimitive(com.google.crypto.tink.Aead::class.java)
+        } else {
+            // Генерируем новый ключ и сохраняем
+            val keysetHandle = KeysetHandle.generateNew(KeyTemplates.get("AES256_GCM"))
+            CleartextKeysetHandle.write(keysetHandle, JsonKeysetWriter.withFile(keysetFile))
+            keysetHandle.getPrimitive(com.google.crypto.tink.Aead::class.java)
+        }
     }
 
     fun encrypt(plain: ByteArray): ByteArray = aead.encrypt(plain, null)
@@ -44,7 +59,7 @@ object WalletOps {
 
     /**
      * BTC адрес по мнемонике.
-     * @param format  "legacy" (BIP44, P2PKH) | "bech32" (BIP84, P2WPKH)
+     * @param purpose 44 (legacy) | 49 (p2sh-segwit) | 84 (bech32)
      * @param network "mainnet" | "testnet"
      * @param account HD account (по умолчанию 0)
      * @param change  0 (external) | 1 (internal)
@@ -52,8 +67,8 @@ object WalletOps {
      */
     fun btcAddressFromSeed(
         mnemonic: String,
-        format: String = "bech32",
-        network: String = "mainnet",
+        purpose: Int = 84,
+        network: String = "testnet",
         account: Int = 0,
         change: Int = 0,
         index: Int = 0
@@ -62,30 +77,31 @@ object WalletOps {
             if (network.equals("testnet", ignoreCase = true)) TestNet3Params.get()
             else MainNetParams.get()
 
-        val purpose = if (format.equals("legacy", true)) 44 else 84 // BIP44 vs BIP84
         val seed = DeterministicSeed(mnemonic, null, "", 0L)
         val chain = DeterministicKeyChain.builder().seed(seed).build()
 
         val path = listOf(
             ChildNumber(purpose, true),
-            ChildNumber(0, true),                 // coin_type' (0 = BTC; test/main — через params)
+            ChildNumber(if (network == "testnet") 1 else 0, true), // coin_type' (0=mainnet, 1=testnet)
             ChildNumber(account, true),           // account'
             ChildNumber(change, false),           // external/internal
             ChildNumber(index, false)             // address index
         )
         val key = chain.getKeyByPath(path, true)
 
-        return if (format.equals("legacy", true))
-            LegacyAddress.fromKey(params, key).toString()
-        else
-            SegwitAddress.fromKey(params, key).toBech32()
+        return when (purpose) {
+            44 -> LegacyAddress.fromKey(params, key).toString()           // P2PKH (legacy)
+            49 -> throw IllegalArgumentException("BIP49 not implemented. Use --purpose 44 or 84")
+            84 -> SegwitAddress.fromKey(params, key).toBech32()           // P2WPKH (bech32)
+            else -> throw IllegalArgumentException("Unsupported purpose: $purpose")
+        }
     }
 
-    /** Сгенерировать диапазон BTC-адресов с индексами [startIndex, endIndex] включительно. */
+    /** Сгенерировать диапазон BTC-адресов */
     fun btcAddressesRange(
         mnemonic: String,
-        format: String = "bech32",
-        network: String = "mainnet",
+        purpose: Int = 84,
+        network: String = "testnet", // ← testnet по умолчанию
         account: Int = 0,
         change: Int = 0,
         startIndex: Int = 0,
@@ -93,14 +109,14 @@ object WalletOps {
     ): List<String> {
         require(startIndex >= 0 && endIndex >= startIndex) { "invalid index range" }
         return (startIndex..endIndex).map { i ->
-            btcAddressFromSeed(mnemonic, format, network, account, change, i)
+            btcAddressFromSeed(mnemonic, purpose, network, account, change, i)
         }
     }
 }
 
 // --------- Примитивное файловое хранилище зашифрованного seed (ПК) ----------
 object SeedStorage {
-    private val dir: Path = Path.of(System.getProperty("user.home"), ".wallet-starter")
+    private val dir: Path = java.nio.file.Paths.get(System.getProperty("user.home"), ".wallet-starter")
     private val file: Path = dir.resolve("seed.enc")
 
     fun saveEncrypted(bytes: ByteArray) {

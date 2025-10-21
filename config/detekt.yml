@@ -1,0 +1,23 @@
+build:
+  maxIssues: 10
+  weights:
+    complexity: 2
+    LongParameterList: 1
+    style: 1
+
+complexity:
+  active: true
+  LongMethod:
+    active: true
+    threshold: 20
+  LongParameterList:
+    active: true
+    threshold: 5
+
+style:
+  active: true
+  NewLineAtEndOfFile:
+    active: true
+  MaxLineLength:
+    active: true
+    threshold: 120

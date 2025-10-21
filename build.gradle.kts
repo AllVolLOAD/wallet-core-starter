@@ -7,7 +7,9 @@ plugins {
 
 // Общая настройка toolchain для JVM-модулей (если нужно)
 subprojects {
+
     plugins.withId("org.jetbrains.kotlin.jvm") {
         the<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension>().jvmToolchain(21)
     }
+
 }

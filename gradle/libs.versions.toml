@@ -7,6 +7,8 @@ bitcoinj = "0.16.2"
 slf4j = "2.0.13"
 junit = "5.10.3"
 gradle-plugin-kotlin = "2.0.20"
+ktlint = "0.50.0"
+
 
 [libraries]
 coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
@@ -18,3 +20,4 @@ junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "jun
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+ktlint = { id = "org.jlleitschuh.gradle.ktlint", version = "11.6.1" }
